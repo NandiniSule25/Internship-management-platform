@@ -46,3 +46,5 @@ server/prisma/*.db-journal
 # Temporary / OS files
 tmp/
 temp/
+
+.vercel

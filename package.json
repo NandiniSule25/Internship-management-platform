@@ -16,7 +16,7 @@
     "client:dev": "npm --prefix client run dev",
     "client:build": "npm --prefix client run build",
     "build": "npm run vercel-build",
-    "vercel-build": "npm --prefix server run prisma:generate && npm --prefix client run build"
+    "vercel-build": "npm run --workspaces --if-present vercel-build"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
@@ -25,9 +25,7 @@
     "dotenv": "^16.4.5",
     "express": "^4.21.1",
     "jsonwebtoken": "^9.0.2",
-    "pdfkit": "^0.15.1"
-  },
-  "devDependencies": {
+    "pdfkit": "^0.15.1",
     "prisma": "^5.22.0"
   }
 }
