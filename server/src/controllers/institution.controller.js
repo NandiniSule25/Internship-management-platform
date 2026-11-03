@@ -7,7 +7,10 @@ const { prisma } = require('../config/db');
  */
 async function getInstitutionMetrics(req, res) {
   try {
-    const institutionId = req.params.id || req.user.institutionId;
+    let institutionId = req.params.id;
+    if (!institutionId || institutionId === 'me') {
+      institutionId = req.user.institutionId;
+    }
 
     // Security check: ensure user belongs to this institution
     if (req.user.institutionId !== institutionId) {
@@ -162,7 +165,10 @@ async function getInstitutionMetrics(req, res) {
  */
 async function getInstitutionUsers(req, res) {
   try {
-    const institutionId = req.params.id || req.user.institutionId;
+    let institutionId = req.params.id;
+    if (!institutionId || institutionId === 'me') {
+      institutionId = req.user.institutionId;
+    }
     const { role } = req.query;
 
     if (req.user.institutionId !== institutionId) {

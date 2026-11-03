@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { useAuth } from '../context/AuthContext';
 import { X, Briefcase, Calendar, Users, Building, AlertCircle } from 'lucide-react';
 
 export default function CreateCohortModal({ isOpen, onClose, onCreated }) {
+  const { user } = useAuth();
   const [loading, setLoading] = useState(false);
+  const [loadingUsers, setLoadingUsers] = useState(false);
   const [error, setError] = useState(null);
   const [mentors, setMentors] = useState([]);
   const [interns, setInterns] = useState([]);
@@ -23,9 +26,11 @@ export default function CreateCohortModal({ isOpen, onClose, onCreated }) {
     if (isOpen) {
       async function loadInstitutionUsers() {
         try {
+          setLoadingUsers(true);
+          const instId = user?.institutionId || 'me';
           const [mentorsRes, internsRes] = await Promise.all([
-            axios.get('/api/institutions/me/users?role=MENTOR'),
-            axios.get('/api/institutions/me/users?role=INTERN'),
+            axios.get(`/api/institutions/${instId}/users?role=MENTOR`),
+            axios.get(`/api/institutions/${instId}/users?role=INTERN`),
           ]);
           if (mentorsRes.data?.users) {
             setMentors(mentorsRes.data.users);
@@ -41,11 +46,13 @@ export default function CreateCohortModal({ isOpen, onClose, onCreated }) {
           }
         } catch (err) {
           console.error('Failed to load mentors/interns:', err);
+        } finally {
+          setLoadingUsers(false);
         }
       }
       loadInstitutionUsers();
     }
-  }, [isOpen]);
+  }, [isOpen, user?.institutionId]);
 
   if (!isOpen) return null;
 
@@ -173,7 +180,10 @@ export default function CreateCohortModal({ isOpen, onClose, onCreated }) {
           {/* Mentor Allocation */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">Assign Mentor</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-semibold text-slate-300">Assign Mentor</label>
+                {loadingUsers && <span className="text-[10px] text-slate-400">Loading...</span>}
+              </div>
               <select
                 name="mentorId"
                 value={form.mentorId}
@@ -187,11 +197,19 @@ export default function CreateCohortModal({ isOpen, onClose, onCreated }) {
                   </option>
                 ))}
               </select>
+              {mentors.length === 0 && !loadingUsers && (
+                <p className="mt-1 text-[11px] text-amber-400/90 leading-tight">
+                  No mentors registered in this institution yet.
+                </p>
+              )}
             </div>
 
             {/* Intern Allocation */}
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">Enroll Intern</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-semibold text-slate-300">Enroll Intern</label>
+                {loadingUsers && <span className="text-[10px] text-slate-400">Loading...</span>}
+              </div>
               <select
                 name="internId"
                 value={form.internId}
@@ -205,6 +223,11 @@ export default function CreateCohortModal({ isOpen, onClose, onCreated }) {
                   </option>
                 ))}
               </select>
+              {interns.length === 0 && !loadingUsers && (
+                <p className="mt-1 text-[11px] text-amber-400/90 leading-tight">
+                  No interns enrolled in this institution yet.
+                </p>
+              )}
             </div>
           </div>
 
