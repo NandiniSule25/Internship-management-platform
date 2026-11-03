@@ -20,12 +20,18 @@ import {
   History,
 } from 'lucide-react';
 
-export default function TaskBoard() {
+export default function TaskBoard({ initialCohortId = 'ALL' }) {
   const { user } = useAuth();
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [cohortFilter, setCohortFilter] = useState('ALL');
+  const [cohortFilter, setCohortFilter] = useState(initialCohortId || 'ALL');
   const [cohorts, setCohorts] = useState([]);
+
+  useEffect(() => {
+    if (initialCohortId) {
+      setCohortFilter(initialCohortId);
+    }
+  }, [initialCohortId]);
 
   // Modals state
   const [showCreateModal, setShowCreateModal] = useState(false);

@@ -12,7 +12,7 @@ import EvaluationsView from './pages/EvaluationsView';
 function AppContent() {
   const { user, loading } = useAuth();
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [selectedCohort, setSelectedCohort] = useState(null);
+  const [selectedCohortId, setSelectedCohortId] = useState('ALL');
 
   if (loading) {
     return (
@@ -35,11 +35,19 @@ function AppContent() {
     }
 
     if (activeTab === 'internships') {
-      return <InternshipsList onSelectCohort={(cohort) => setSelectedCohort(cohort)} />;
+      return (
+        <InternshipsList
+          onSelectCohort={(cohort) => setSelectedCohortId(cohort.id)}
+          onNavigateToTasks={(cohortId) => {
+            setSelectedCohortId(cohortId);
+            setActiveTab('tasks');
+          }}
+        />
+      );
     }
 
     if (activeTab === 'tasks') {
-      return <TaskBoard />;
+      return <TaskBoard initialCohortId={selectedCohortId} />;
     }
 
     if (activeTab === 'evaluations') {
@@ -56,7 +64,7 @@ function AppContent() {
 
   return (
     <div className="min-h-screen bg-[#070b14] text-slate-100 flex flex-col font-sans">
-      <Navbar activeTab={activeTab} onSelectTab={(tab) => { setActiveTab(tab); setSelectedCohort(null); }} />
+      <Navbar activeTab={activeTab} onSelectTab={(tab) => { setActiveTab(tab); setSelectedCohortId('ALL'); }} />
       <main className="flex-1">
         {renderActiveView()}
       </main>

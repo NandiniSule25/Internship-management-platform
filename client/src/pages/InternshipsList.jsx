@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
+import CohortDetailsModal from '../components/CohortDetailsModal';
 import {
   Briefcase,
   Users,
@@ -13,26 +14,28 @@ import {
   ArrowRight,
 } from 'lucide-react';
 
-export default function InternshipsList({ onSelectCohort }) {
+export default function InternshipsList({ onSelectCohort, onNavigateToTasks }) {
   const { user } = useAuth();
   const [cohorts, setCohorts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('ALL');
+  const [selectedCohortForModal, setSelectedCohortForModal] = useState(null);
+
+  const loadCohorts = async () => {
+    try {
+      setLoading(true);
+      const res = await axios.get('/api/internships');
+      if (res.data?.internships) {
+        setCohorts(res.data.internships);
+      }
+    } catch (err) {
+      console.error('Failed to load internships:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    async function loadCohorts() {
-      try {
-        setLoading(true);
-        const res = await axios.get('/api/internships');
-        if (res.data?.internships) {
-          setCohorts(res.data.internships);
-        }
-      } catch (err) {
-        console.error('Failed to load internships:', err);
-      } finally {
-        setLoading(false);
-      }
-    }
     loadCohorts();
   }, []);
 
@@ -159,7 +162,10 @@ export default function InternshipsList({ onSelectCohort }) {
                   {cohort._count?.tasks || 0} Tasks Assigned
                 </span>
                 <button
-                  onClick={() => onSelectCohort && onSelectCohort(cohort)}
+                  onClick={() => {
+                    setSelectedCohortForModal(cohort.id);
+                    if (onSelectCohort) onSelectCohort(cohort);
+                  }}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold text-xs text-white bg-indigo-600/80 hover:bg-indigo-600 cursor-pointer transition-all shadow-glow"
                 >
                   <span>View Details</span>
@@ -176,6 +182,18 @@ export default function InternshipsList({ onSelectCohort }) {
           )}
         </div>
       )}
+
+      {/* Cohort Details Modal */}
+      <CohortDetailsModal
+        cohortId={selectedCohortForModal}
+        isOpen={Boolean(selectedCohortForModal)}
+        onClose={() => setSelectedCohortForModal(null)}
+        onNavigateToTasks={(cohortId) => {
+          setSelectedCohortForModal(null);
+          if (onNavigateToTasks) onNavigateToTasks(cohortId);
+        }}
+        onCohortUpdated={loadCohorts}
+      />
     </div>
   );
 }
