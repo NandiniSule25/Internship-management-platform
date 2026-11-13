@@ -1,0 +1,7 @@
+# Server environment variables & secrets
+.env
+.env.local
+.env.*.local
+*.env
+!.env.example
+node_modules/
