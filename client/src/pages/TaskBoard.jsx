@@ -18,6 +18,15 @@ import {
   Briefcase,
   X,
   History,
+  Paperclip,
+  Download,
+  Check,
+  RotateCcw,
+  Sparkles,
+  Eye,
+  FileCheck,
+  FileText,
+  AlertCircle,
 } from 'lucide-react';
 
 export default function TaskBoard({ initialCohortId = 'ALL' }) {
@@ -58,10 +67,13 @@ export default function TaskBoard({ initialCohortId = 'ALL' }) {
     fetchTasksAndCohorts();
   }, []);
 
-  const handleStatusChange = async (taskId, newStatus) => {
+  const handleStatusChange = async (taskId, newStatus, reviewNote = '') => {
     try {
-      await axios.patch(`/api/tasks/${taskId}/status`, { status: newStatus });
+      await axios.patch(`/api/tasks/${taskId}/status`, { status: newStatus, reviewNote });
       await fetchTasksAndCohorts();
+      if (selectedTaskForTimeline?.id === taskId) {
+        setSelectedTaskForTimeline((prev) => (prev ? { ...prev, status: newStatus } : null));
+      }
     } catch (err) {
       alert(err.response?.data?.message || 'Failed to update task status');
     }
@@ -71,6 +83,18 @@ export default function TaskBoard({ initialCohortId = 'ALL' }) {
     if (cohortFilter === 'ALL') return true;
     return t.internshipId === cohortFilter;
   });
+
+  // Calculate dynamic progress bar stats
+  const totalCount = filteredTasks.length;
+  const completedCount = filteredTasks.filter((t) => t.status === 'COMPLETED').length;
+  const underReviewCount = filteredTasks.filter((t) => t.status === 'UNDER_REVIEW').length;
+  const inProgressCount = filteredTasks.filter((t) => t.status === 'IN_PROGRESS').length;
+  const todoCount = filteredTasks.filter((t) => t.status === 'TODO').length;
+  const progressPercentage = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+  const underReviewPct = totalCount > 0 ? Math.round((underReviewCount / totalCount) * 100) : 0;
+  const inProgressPct = totalCount > 0 ? Math.round((inProgressCount / totalCount) * 100) : 0;
+
+  const currentCohort = cohorts.find((c) => c.id === cohortFilter);
 
   const getPriorityBadge = (priority) => {
     switch (priority) {
@@ -111,7 +135,7 @@ export default function TaskBoard({ initialCohortId = 'ALL' }) {
   ];
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
       {/* Header & Controls */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-slate-800">
         <div>
@@ -128,7 +152,7 @@ export default function TaskBoard({ initialCohortId = 'ALL' }) {
             <span>Task Allocation & Progress Tracker</span>
           </h1>
           <p className="text-xs sm:text-sm text-slate-400">
-            Sprint deliverables, real-time status transitions, daily work notes, and submission review pipelines.
+            Sprint deliverables, real-time status transitions, proof verification, and dynamic milestone tracking.
           </p>
         </div>
 
@@ -163,6 +187,97 @@ export default function TaskBoard({ initialCohortId = 'ALL' }) {
         </div>
       </div>
 
+      {/* DYNAMIC INTERN MILESTONE PROGRESS BAR (Increases on Approved Work, Decreases if Changes Requested) */}
+      <div className="p-5 rounded-2xl glass-card bg-slate-900/80 border border-slate-700/80 shadow-xl space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+                <TrendingUp className="w-4 h-4" />
+                Intern Deliverable Progress Bar
+              </span>
+              {currentCohort && (
+                <span className="text-[11px] px-2 py-0.5 rounded-md bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 font-medium">
+                  {currentCohort.title}
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-slate-400">
+              {user.role === 'MENTOR'
+                ? "Verify intern work proofs below. Approving tasks increases the intern's progress bar; requesting revisions decreases it."
+                : user.role === 'INTERN'
+                ? 'Submit daily deliverables with proof (files & links). Once your mentor approves your work, your progress bar increases!'
+                : 'Real-time completion percentage based on verified, completed deliverables.'}
+            </p>
+          </div>
+
+          <div className="flex items-baseline gap-1.5 sm:self-center">
+            <span className="text-3xl font-extrabold text-white tracking-tight">{progressPercentage}%</span>
+            <span className="text-xs font-semibold text-slate-400">Completed</span>
+          </div>
+        </div>
+
+        {/* Multi-Segment Dynamic Progress Track */}
+        <div className="space-y-2">
+          <div className="w-full h-3.5 rounded-full bg-slate-800 p-0.5 flex overflow-hidden border border-slate-700/60">
+            {/* Completed (Green) */}
+            <div
+              className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 rounded-l-full transition-all duration-500 shadow-glow-emerald"
+              style={{ width: `${progressPercentage}%` }}
+              title={`Completed: ${progressPercentage}%`}
+            ></div>
+            {/* Under Review (Cyan/Blue) */}
+            <div
+              className="h-full bg-cyan-400/80 transition-all duration-500"
+              style={{ width: `${underReviewPct}%` }}
+              title={`Under Review: ${underReviewPct}%`}
+            ></div>
+            {/* In Progress (Amber) */}
+            <div
+              className="h-full bg-amber-400/70 transition-all duration-500"
+              style={{ width: `${inProgressPct}%` }}
+              title={`In Progress: ${inProgressPct}%`}
+            ></div>
+          </div>
+
+          {/* Breakdown Counters */}
+          <div className="flex flex-wrap items-center justify-between gap-2 text-xs pt-1">
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="flex items-center gap-1.5 text-slate-300">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
+                <strong className="text-white">{completedCount}</strong> of {totalCount} Completed
+              </span>
+
+              <span className={`flex items-center gap-1.5 ${underReviewCount > 0 ? 'text-cyan-300 font-semibold' : 'text-slate-400'}`}>
+                <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse"></span>
+                <strong>{underReviewCount}</strong> Awaiting Review
+                {underReviewCount > 0 && user.role === 'MENTOR' && (
+                  <span className="text-[10px] px-1.5 py-0.2 rounded bg-cyan-500/20 text-cyan-200 border border-cyan-500/30">
+                    Needs Action
+                  </span>
+                )}
+              </span>
+
+              <span className="flex items-center gap-1.5 text-slate-400">
+                <span className="w-2.5 h-2.5 rounded-full bg-amber-400"></span>
+                <strong>{inProgressCount}</strong> In Progress
+              </span>
+
+              <span className="flex items-center gap-1.5 text-slate-400">
+                <span className="w-2.5 h-2.5 rounded-full bg-violet-400"></span>
+                <strong>{todoCount}</strong> To Do
+              </span>
+            </div>
+
+            {totalCount > 0 && (
+              <span className="text-[11px] text-slate-400 font-mono">
+                {totalCount - completedCount} tasks remaining
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+
       {loading ? (
         <div className="p-12 text-center text-slate-400">
           <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
@@ -192,16 +307,51 @@ export default function TaskBoard({ initialCohortId = 'ALL' }) {
                 <div className="space-y-3 flex-1">
                   {columnTasks.map((task) => {
                     const deadlineInfo = getDeadlineInfo(task.deadline);
+                    const isUnderReview = task.status === 'UNDER_REVIEW';
+                    const isCompleted = task.status === 'COMPLETED';
+                    const latestUpdate = task.progressUpdates?.[0];
+                    const hasProof = Boolean(latestUpdate?.workUrl);
+
                     return (
                       <div
                         key={task.id}
-                        className="p-4 rounded-xl bg-slate-800/60 hover:bg-slate-800/90 border border-slate-700/60 transition-all space-y-3 glass-card-hover group"
+                        className={`p-4 rounded-xl transition-all space-y-3 glass-card-hover group relative ${
+                          isUnderReview
+                            ? 'bg-slate-800/90 border-2 border-cyan-500/60 shadow-glow'
+                            : isCompleted
+                            ? 'bg-slate-900/80 border border-emerald-500/30'
+                            : 'bg-slate-800/60 hover:bg-slate-800/90 border border-slate-700/60'
+                        }`}
                       >
-                        {/* Priority and Deadline Badges */}
-                        <div className="flex items-center justify-between gap-2">
-                          <span className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md border ${getPriorityBadge(task.priority)}`}>
-                            {task.priority}
-                          </span>
+                        {/* Under Review Notice Banner */}
+                        {isUnderReview && (
+                          <div className="p-2 rounded-lg bg-cyan-500/10 border border-cyan-500/30 text-[11px] text-cyan-300 flex items-center justify-between gap-1">
+                            <span className="font-semibold flex items-center gap-1">
+                              <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+                              {user.role === 'MENTOR' ? 'Proof submitted for review!' : 'Submitted to mentor'}
+                            </span>
+                            <button
+                              onClick={() => setSelectedTaskForTimeline(task)}
+                              className="text-cyan-400 hover:underline font-bold text-[10px] cursor-pointer"
+                            >
+                              View Proof →
+                            </button>
+                          </div>
+                        )}
+
+                        {/* Priority, Proof Badge, and Deadline */}
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                          <div className="flex items-center gap-1.5">
+                            <span className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md border ${getPriorityBadge(task.priority)}`}>
+                              {task.priority}
+                            </span>
+                            {hasProof && (
+                              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 flex items-center gap-1">
+                                <Paperclip className="w-2.5 h-2.5" />
+                                <span>Proof</span>
+                              </span>
+                            )}
+                          </div>
                           <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-md border flex items-center gap-1 ${deadlineInfo.class}`}>
                             <Clock className="w-3 h-3" />
                             <span>{deadlineInfo.text}</span>
@@ -237,8 +387,8 @@ export default function TaskBoard({ initialCohortId = 'ALL' }) {
 
                           <button
                             onClick={() => setSelectedTaskForTimeline(task)}
-                            className="text-[11px] text-indigo-400 hover:text-indigo-300 flex items-center gap-1 cursor-pointer"
-                            title="View Progress History"
+                            className="text-[11px] text-indigo-400 hover:text-indigo-300 flex items-center gap-1 cursor-pointer font-medium"
+                            title="View Proof & History"
                           >
                             <History className="w-3 h-3" />
                             <span>{task._count?.progressUpdates || 0} updates</span>
@@ -246,27 +396,51 @@ export default function TaskBoard({ initialCohortId = 'ALL' }) {
                         </div>
 
                         {/* Action buttons on card */}
-                        <div className="pt-2 border-t border-slate-700/60 flex items-center justify-between gap-2">
-                          {/* Log Progress button (Intern or Mentor) */}
-                          <button
-                            onClick={() => setSelectedTaskForProgress(task)}
-                            className="flex-1 py-1 px-2 rounded-lg text-[11px] font-semibold bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center justify-center gap-1 cursor-pointer transition-colors"
-                          >
-                            <TrendingUp className="w-3 h-3" />
-                            <span>Log Work</span>
-                          </button>
+                        <div className="pt-2 border-t border-slate-700/60 space-y-2">
+                          {/* Quick Mentor Decision Controls on Review tasks */}
+                          {(user.role === 'MENTOR' || user.role === 'INSTITUTION_ADMIN') && isUnderReview && (
+                            <div className="grid grid-cols-2 gap-1.5">
+                              <button
+                                onClick={() => handleStatusChange(task.id, 'COMPLETED', 'Proof approved by mentor. Deliverable accepted.')}
+                                className="py-1 px-2 rounded-lg text-[10px] font-bold bg-emerald-600 hover:bg-emerald-500 text-white flex items-center justify-center gap-1 cursor-pointer shadow-glow-emerald transition-all"
+                                title="Approve and increase progress bar"
+                              >
+                                <Check className="w-3 h-3" />
+                                <span>Approve (100%)</span>
+                              </button>
+                              <button
+                                onClick={() => handleStatusChange(task.id, 'IN_PROGRESS', 'Revisions requested by mentor. Please check requirements and re-upload.')}
+                                className="py-1 px-2 rounded-lg text-[10px] font-bold bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/30 flex items-center justify-center gap-1 cursor-pointer transition-colors"
+                                title="Send back for revisions"
+                              >
+                                <RotateCcw className="w-3 h-3" />
+                                <span>Request Edit</span>
+                              </button>
+                            </div>
+                          )}
 
-                          {/* Quick status transition dropdown */}
-                          <select
-                            value={task.status}
-                            onChange={(e) => handleStatusChange(task.id, e.target.value)}
-                            className="glass-input text-[11px] px-2 py-1 rounded-lg bg-slate-900 cursor-pointer"
-                          >
-                            <option value="TODO">To Do</option>
-                            <option value="IN_PROGRESS">In Progress</option>
-                            <option value="UNDER_REVIEW">Review</option>
-                            <option value="COMPLETED">Completed</option>
-                          </select>
+                          <div className="flex items-center justify-between gap-2">
+                            {/* Submit Work / Log Progress button (Intern or Mentor) */}
+                            <button
+                              onClick={() => setSelectedTaskForProgress(task)}
+                              className="flex-1 py-1.5 px-2 rounded-lg text-[11px] font-semibold bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center justify-center gap-1 cursor-pointer transition-colors"
+                            >
+                              <TrendingUp className="w-3 h-3" />
+                              <span>{user.role === 'INTERN' ? 'Submit Work & Proof' : 'Log Work'}</span>
+                            </button>
+
+                            {/* Status dropdown */}
+                            <select
+                              value={task.status}
+                              onChange={(e) => handleStatusChange(task.id, e.target.value)}
+                              className="glass-input text-[11px] px-2 py-1.5 rounded-lg bg-slate-900 cursor-pointer font-medium"
+                            >
+                              <option value="TODO">To Do</option>
+                              <option value="IN_PROGRESS">In Progress</option>
+                              <option value="UNDER_REVIEW">Under Review</option>
+                              <option value="COMPLETED">Completed</option>
+                            </select>
+                          </div>
                         </div>
                       </div>
                     );
@@ -284,14 +458,17 @@ export default function TaskBoard({ initialCohortId = 'ALL' }) {
         </div>
       )}
 
-      {/* Side Timeline Drawer for Task Progress Updates */}
+      {/* Side Timeline & Proof Review Drawer */}
       {selectedTaskForTimeline && (
-        <div className="fixed inset-0 z-50 flex justify-end bg-black/70 backdrop-blur-sm animate-fade-in">
-          <div className="w-full max-w-md h-full glass-card bg-slate-900 border-l border-slate-700 p-6 overflow-y-auto space-y-5">
+        <div className="fixed inset-0 z-50 flex justify-end bg-black/75 backdrop-blur-sm animate-fade-in">
+          <div className="w-full max-w-lg h-full glass-card bg-slate-900 border-l border-slate-700 p-6 overflow-y-auto space-y-5">
             <div className="flex items-center justify-between pb-4 border-b border-slate-800">
               <div className="flex items-center gap-2">
                 <History className="w-5 h-5 text-indigo-400" />
-                <h3 className="text-base font-bold text-white">Work Progress Timeline</h3>
+                <div>
+                  <h3 className="text-base font-bold text-white">Deliverable Proof & Timeline</h3>
+                  <p className="text-[11px] text-slate-400">Review submitted work files, links, and status changes</p>
+                </div>
               </div>
               <button
                 onClick={() => setSelectedTaskForTimeline(null)}
@@ -301,15 +478,21 @@ export default function TaskBoard({ initialCohortId = 'ALL' }) {
               </button>
             </div>
 
-            <div>
+            <div className="p-3 rounded-xl bg-slate-800/40 border border-slate-800 space-y-1 text-xs">
               <h4 className="text-sm font-bold text-white">{selectedTaskForTimeline.title}</h4>
-              <p className="text-xs text-slate-400 mt-1">
-                Intern: {selectedTaskForTimeline.assignee?.firstName} {selectedTaskForTimeline.assignee?.lastName}
-              </p>
+              <div className="flex items-center justify-between text-slate-400 text-[11px]">
+                <span>Intern: {selectedTaskForTimeline.assignee?.firstName} {selectedTaskForTimeline.assignee?.lastName}</span>
+                <span className="font-semibold text-indigo-300">Status: {selectedTaskForTimeline.status}</span>
+              </div>
             </div>
 
-            {/* Fetch task updates */}
-            <TaskProgressTimeline taskId={selectedTaskForTimeline.id} />
+            {/* Fetch and display task updates with proof files & links */}
+            <TaskProgressTimeline
+              taskId={selectedTaskForTimeline.id}
+              taskStatus={selectedTaskForTimeline.status}
+              userRole={user.role}
+              onStatusUpdate={(newStatus, reviewNote) => handleStatusChange(selectedTaskForTimeline.id, newStatus, reviewNote)}
+            />
           </div>
         </div>
       )}
@@ -331,10 +514,12 @@ export default function TaskBoard({ initialCohortId = 'ALL' }) {
   );
 }
 
-// Inner helper component to render historical progress updates
-function TaskProgressTimeline({ taskId }) {
+// Inner helper component to render historical progress updates and parse proof files
+function TaskProgressTimeline({ taskId, taskStatus, userRole, onStatusUpdate }) {
   const [updates, setUpdates] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [reviewComment, setReviewComment] = useState('');
+  const [submittingDecision, setSubmittingDecision] = useState(false);
 
   useEffect(() => {
     async function loadTimeline() {
@@ -352,55 +537,206 @@ function TaskProgressTimeline({ taskId }) {
     loadTimeline();
   }, [taskId]);
 
-  if (loading) {
-    return <div className="text-xs text-slate-400">Loading progress history...</div>;
-  }
+  const parseProof = (rawUrl) => {
+    if (!rawUrl) return null;
+    try {
+      if (rawUrl.trim().startsWith('{')) {
+        const parsed = JSON.parse(rawUrl);
+        return {
+          link: parsed.link || null,
+          fileUrl: parsed.fileUrl || null,
+          fileName: parsed.fileName || 'Proof_Document',
+          fileSize: parsed.fileSize || null,
+        };
+      }
+    } catch {
+      // Not JSON, continue to fallback checks
+    }
 
-  if (updates.length === 0) {
-    return (
-      <div className="py-8 text-center text-slate-400 text-xs space-y-1">
-        <TrendingUp className="w-6 h-6 mx-auto text-slate-600 mb-2" />
-        <p>No progress updates logged yet for this task.</p>
-        <p className="text-slate-500">The intern can use the "Log Work" button to record updates.</p>
-      </div>
-    );
+    if (rawUrl.startsWith('data:')) {
+      return {
+        link: null,
+        fileUrl: rawUrl,
+        fileName: 'Attached_Proof_File',
+        fileSize: null,
+      };
+    }
+
+    return {
+      link: rawUrl,
+      fileUrl: null,
+      fileName: null,
+      fileSize: null,
+    };
+  };
+
+  const handleDownloadFile = (dataUrl, fileName) => {
+    const a = document.createElement('a');
+    a.href = dataUrl;
+    a.download = fileName || 'Internship_Proof_Deliverable';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  };
+
+  const handleDecision = async (newStatus) => {
+    setSubmittingDecision(true);
+    await onStatusUpdate(newStatus, reviewComment || (newStatus === 'COMPLETED' ? 'Approved by mentor' : 'Changes requested'));
+    setReviewComment('');
+    // reload updates
+    try {
+      const res = await axios.get(`/api/tasks/${taskId}`);
+      if (res.data?.task?.progressUpdates) setUpdates(res.data.task.progressUpdates);
+    } catch (e) {
+      console.error(e);
+    }
+    setSubmittingDecision(false);
+  };
+
+  if (loading) {
+    return <div className="text-xs text-slate-400 py-6 text-center">Loading progress & proof history...</div>;
   }
 
   return (
     <div className="space-y-4">
-      {updates.map((up) => (
-        <div key={up.id} className="p-4 rounded-xl bg-slate-800/50 border border-slate-700/60 space-y-2 text-xs">
+      {/* Mentor Decision Box if task is in Review or In Progress */}
+      {(userRole === 'MENTOR' || userRole === 'INSTITUTION_ADMIN') && (
+        <div className="p-4 rounded-xl bg-slate-800/80 border border-slate-700 space-y-3">
           <div className="flex items-center justify-between">
-            <span className="font-semibold text-indigo-300">
-              {up.intern?.firstName} {up.intern?.lastName}
+            <span className="text-xs font-bold text-white flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+              Mentor Proof Verification Decision
             </span>
-            <span className="text-[10px] text-slate-400 font-mono">
-              {new Date(up.createdAt).toLocaleString()}
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-900 text-slate-300 font-mono">
+              Status: {taskStatus}
             </span>
           </div>
 
-          <p className="text-slate-200 leading-relaxed whitespace-pre-wrap">{up.updateNote}</p>
+          <textarea
+            rows="2"
+            value={reviewComment}
+            onChange={(e) => setReviewComment(e.target.value)}
+            placeholder="Add mentor feedback or instructions for intern (optional)..."
+            className="glass-input w-full px-3 py-1.5 rounded-lg text-xs"
+          ></textarea>
 
-          <div className="flex items-center justify-between pt-2 border-t border-slate-700/40 text-[11px]">
-            {up.hoursSpent && (
-              <span className="text-amber-400 flex items-center gap-1 font-semibold">
-                <Clock className="w-3 h-3" /> {up.hoursSpent} hrs logged
-              </span>
-            )}
-            {up.workUrl && (
-              <a
-                href={up.workUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="text-cyan-400 hover:underline flex items-center gap-1"
-              >
-                <span>Deliverable</span>
-                <ExternalLink className="w-3 h-3" />
-              </a>
-            )}
+          <div className="grid grid-cols-2 gap-2 pt-1">
+            <button
+              onClick={() => handleDecision('COMPLETED')}
+              disabled={submittingDecision || taskStatus === 'COMPLETED'}
+              className="px-3 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 shadow-glow-emerald cursor-pointer transition-all disabled:opacity-40 flex items-center justify-center gap-1.5"
+            >
+              <Check className="w-3.5 h-3.5" />
+              <span>Approve & Complete</span>
+            </button>
+
+            <button
+              onClick={() => handleDecision('IN_PROGRESS')}
+              disabled={submittingDecision || taskStatus === 'IN_PROGRESS'}
+              className="px-3 py-2 rounded-xl text-xs font-bold text-amber-300 bg-slate-900 hover:bg-slate-800 border border-amber-500/40 cursor-pointer transition-colors disabled:opacity-40 flex items-center justify-center gap-1.5"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span>Request Revisions</span>
+            </button>
           </div>
+          <p className="text-[10px] text-slate-400 italic">
+            * Approving updates the task to Completed and increases the progress bar. Requesting revisions moves it to In Progress and decreases the progress bar.
+          </p>
         </div>
-      ))}
+      )}
+
+      {updates.length === 0 ? (
+        <div className="py-8 text-center text-slate-400 text-xs space-y-1">
+          <TrendingUp className="w-6 h-6 mx-auto text-slate-600 mb-2" />
+          <p>No progress updates logged yet for this task.</p>
+          <p className="text-slate-500">The intern can use the "Submit Work & Proof" button to upload deliverables.</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          <h5 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+            Work Submission Logs ({updates.length})
+          </h5>
+          {updates.map((up) => {
+            const proof = parseProof(up.workUrl);
+            const isImage = proof?.fileUrl?.startsWith('data:image/');
+
+            return (
+              <div key={up.id} className="p-4 rounded-xl bg-slate-800/60 border border-slate-700/60 space-y-3 text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-indigo-300">
+                    {up.intern?.firstName} {up.intern?.lastName}
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-mono">
+                    {new Date(up.createdAt).toLocaleString()}
+                  </span>
+                </div>
+
+                <p className="text-slate-200 leading-relaxed whitespace-pre-wrap">{up.updateNote}</p>
+
+                {/* Proof Section: Links and Uploaded File */}
+                {proof && (proof.link || proof.fileUrl) && (
+                  <div className="p-3 rounded-lg bg-slate-900/80 border border-slate-800 space-y-2">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-cyan-400 flex items-center gap-1">
+                      <Paperclip className="w-3 h-3" /> Verified Work Proof
+                    </span>
+
+                    <div className="flex flex-wrap items-center gap-2">
+                      {proof.link && (
+                        <a
+                          href={proof.link}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-xs font-medium cursor-pointer transition-colors"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                          <span>Open Deliverable URL</span>
+                        </a>
+                      )}
+
+                      {proof.fileUrl && (
+                        <button
+                          type="button"
+                          onClick={() => handleDownloadFile(proof.fileUrl, proof.fileName)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs font-medium cursor-pointer transition-colors"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                          <span>Download {proof.fileName || 'Proof Document'} {proof.fileSize ? `(${proof.fileSize})` : ''}</span>
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Inline Image Preview */}
+                    {isImage && (
+                      <div className="pt-2">
+                        <img
+                          src={proof.fileUrl}
+                          alt={proof.fileName || 'Proof Preview'}
+                          className="max-h-48 rounded-lg border border-slate-700 object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                          onClick={() => handleDownloadFile(proof.fileUrl, proof.fileName)}
+                          title="Click to download image"
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between pt-1 border-t border-slate-700/40 text-[11px] text-slate-400">
+                  {up.hoursSpent ? (
+                    <span className="text-amber-400 flex items-center gap-1 font-semibold">
+                      <Clock className="w-3 h-3" /> {up.hoursSpent} hrs logged
+                    </span>
+                  ) : (
+                    <span></span>
+                  )}
+                  <span className="text-[10px] px-2 py-0.5 rounded bg-slate-900 border border-slate-700">
+                    Status: {up.statusAtUpdate}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

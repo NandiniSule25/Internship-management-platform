@@ -125,6 +125,17 @@ async function getTasks(req, res) {
         creator: { select: { id: true, firstName: true, lastName: true, email: true } },
         assignee: { select: { id: true, firstName: true, lastName: true, email: true } },
         internship: { select: { id: true, title: true, department: true } },
+        progressUpdates: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          select: {
+            id: true,
+            workUrl: true,
+            hoursSpent: true,
+            createdAt: true,
+            updateNote: true,
+          },
+        },
         _count: { select: { progressUpdates: true } },
       },
       orderBy: [{ deadline: 'asc' }, { createdAt: 'desc' }],
@@ -207,7 +218,7 @@ async function getTaskById(req, res) {
 async function updateTaskStatus(req, res) {
   try {
     const { id } = req.params;
-    const { status } = req.body;
+    const { status, reviewNote } = req.body;
     const { id: userId, role, institutionId } = req.user;
 
     const validStatuses = ['TODO', 'IN_PROGRESS', 'UNDER_REVIEW', 'COMPLETED'];
@@ -251,6 +262,18 @@ async function updateTaskStatus(req, res) {
       },
     });
 
+    // Record review notes if provided by mentor or admin
+    if (reviewNote && typeof reviewNote === 'string' && reviewNote.trim()) {
+      await prisma.progressUpdate.create({
+        data: {
+          taskId: id,
+          internId: task.assigneeId,
+          updateNote: `[${role === 'MENTOR' ? 'Mentor Review' : 'Admin Update'} - Status: ${status}]: ${reviewNote.trim()}`,
+          statusAtUpdate: status,
+        },
+      });
+    }
+
     return res.status(200).json({
       status: 'success',
       message: `Task status updated to ${status}.`,
@@ -274,7 +297,7 @@ async function updateTaskStatus(req, res) {
 async function submitProgressUpdate(req, res) {
   try {
     const { id: taskId } = req.params;
-    const { updateNote, workUrl, hoursSpent, statusAtUpdate } = req.body;
+    const { updateNote, workUrl, hoursSpent, statusAtUpdate, fileUrl, fileName, fileSize } = req.body;
     const { id: internId, institutionId } = req.user;
 
     if (!updateNote || typeof updateNote !== 'string' || updateNote.trim().length === 0) {
@@ -304,6 +327,17 @@ async function submitProgressUpdate(req, res) {
       });
     }
 
+    // If file is attached, pack link + file into structured payload
+    let finalWorkUrl = workUrl ? workUrl.trim() : null;
+    if (fileUrl) {
+      finalWorkUrl = JSON.stringify({
+        link: workUrl ? workUrl.trim() : '',
+        fileUrl,
+        fileName: fileName || 'Uploaded_Proof_Document',
+        fileSize: fileSize || '',
+      });
+    }
+
     const effectiveStatus = statusAtUpdate || task.status;
 
     // Create progress update and optionally update task status in a transaction
@@ -313,7 +347,7 @@ async function submitProgressUpdate(req, res) {
           taskId,
           internId,
           updateNote: updateNote.trim(),
-          workUrl: workUrl ? workUrl.trim() : null,
+          workUrl: finalWorkUrl,
           hoursSpent: hoursSpent ? parseFloat(hoursSpent) : null,
           statusAtUpdate: effectiveStatus,
         },

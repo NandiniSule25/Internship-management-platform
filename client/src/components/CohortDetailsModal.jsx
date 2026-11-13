@@ -173,28 +173,65 @@ export default function CohortDetailsModal({ cohortId, isOpen, onClose, onNaviga
             </div>
 
             {/* Timeline & Progress Bar */}
-            <div className="p-4 rounded-xl bg-slate-800/40 border border-slate-800 space-y-3">
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-slate-400 font-semibold flex items-center gap-1.5">
-                  <Calendar className="w-3.5 h-3.5 text-indigo-400" />
-                  Cohort Timeline
-                </span>
-                <span className="text-slate-300 font-medium">
-                  {new Date(cohort.startDate).toLocaleDateString()} — {new Date(cohort.endDate).toLocaleDateString()}
-                </span>
-              </div>
-              <div>
-                <div className="flex justify-between text-[11px] text-slate-400 mb-1">
-                  <span>Programme Progress</span>
-                  <span className="font-bold text-indigo-400">
-                    {calculateTimelineProgress(cohort.startDate, cohort.endDate)}%
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="p-4 rounded-xl bg-slate-800/40 border border-slate-800 space-y-3">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-slate-400 font-semibold flex items-center gap-1.5">
+                    <Calendar className="w-3.5 h-3.5 text-indigo-400" />
+                    Cohort Timeline
+                  </span>
+                  <span className="text-slate-300 font-medium">
+                    {new Date(cohort.startDate).toLocaleDateString()} — {new Date(cohort.endDate).toLocaleDateString()}
                   </span>
                 </div>
-                <div className="w-full h-2 rounded-full bg-slate-800 overflow-hidden">
-                  <div
-                    className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full transition-all duration-500"
-                    style={{ width: `${calculateTimelineProgress(cohort.startDate, cohort.endDate)}%` }}
-                  ></div>
+                <div>
+                  <div className="flex justify-between text-[11px] text-slate-400 mb-1">
+                    <span>Programme Days Elapsed</span>
+                    <span className="font-bold text-indigo-400">
+                      {calculateTimelineProgress(cohort.startDate, cohort.endDate)}%
+                    </span>
+                  </div>
+                  <div className="w-full h-2 rounded-full bg-slate-800 overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full transition-all duration-500"
+                      style={{ width: `${calculateTimelineProgress(cohort.startDate, cohort.endDate)}%` }}
+                    ></div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Intern Deliverables Progress Bar */}
+              <div className="p-4 rounded-xl bg-slate-800/40 border border-slate-800 space-y-3">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-slate-400 font-semibold flex items-center gap-1.5">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                    Deliverables Progress
+                  </span>
+                  <span className="text-emerald-400 font-bold font-mono">
+                    {cohort.tasks ? cohort.tasks.filter((t) => t.status === 'COMPLETED').length : 0} of {cohort.tasks?.length || 0} Done
+                  </span>
+                </div>
+                <div>
+                  <div className="flex justify-between text-[11px] text-slate-400 mb-1">
+                    <span>Task Completion Rate</span>
+                    <span className="font-bold text-emerald-400">
+                      {cohort.tasks?.length > 0
+                        ? Math.round((cohort.tasks.filter((t) => t.status === 'COMPLETED').length / cohort.tasks.length) * 100)
+                        : 0}%
+                    </span>
+                  </div>
+                  <div className="w-full h-2 rounded-full bg-slate-800 overflow-hidden border border-slate-700/60">
+                    <div
+                      className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 rounded-full transition-all duration-500"
+                      style={{
+                        width: `${
+                          cohort.tasks?.length > 0
+                            ? Math.round((cohort.tasks.filter((t) => t.status === 'COMPLETED').length / cohort.tasks.length) * 100)
+                            : 0
+                        }%`,
+                      }}
+                    ></div>
+                  </div>
                 </div>
               </div>
             </div>

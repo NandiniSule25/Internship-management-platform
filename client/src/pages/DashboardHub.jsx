@@ -22,18 +22,35 @@ import {
 export default function DashboardHub() {
   const { user } = useAuth();
   const [dbStatus, setDbStatus] = useState({ loading: true, data: null });
+  const [tasks, setTasks] = useState([]);
+  const [cohorts, setCohorts] = useState([]);
+  const [loadingData, setLoadingData] = useState(true);
 
   useEffect(() => {
-    async function checkDb() {
+    async function checkDbAndLoad() {
       try {
-        const res = await axios.get('/api/health/db');
-        setDbStatus({ loading: false, data: res.data });
+        const [dbRes, tasksRes, cohortsRes] = await Promise.all([
+          axios.get('/api/health/db'),
+          axios.get('/api/tasks').catch(() => ({ data: { tasks: [] } })),
+          axios.get('/api/internships').catch(() => ({ data: { internships: [] } })),
+        ]);
+        setDbStatus({ loading: false, data: dbRes.data });
+        if (tasksRes.data?.tasks) setTasks(tasksRes.data.tasks);
+        if (cohortsRes.data?.internships) setCohorts(cohortsRes.data.internships);
       } catch (err) {
         setDbStatus({ loading: false, error: err.message });
+      } finally {
+        setLoadingData(false);
       }
     }
-    checkDb();
+    checkDbAndLoad();
   }, []);
+
+  const totalTasks = tasks.length;
+  const completedTasks = tasks.filter((t) => t.status === 'COMPLETED').length;
+  const underReviewTasks = tasks.filter((t) => t.status === 'UNDER_REVIEW').length;
+  const inProgressTasks = tasks.filter((t) => t.status === 'IN_PROGRESS').length;
+  const progressPercentage = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
   const getRoleConfig = () => {
     switch (user?.role) {
@@ -64,14 +81,14 @@ export default function DashboardHub() {
           badgeText: 'MENTOR SUPERVISOR',
           badgeClass: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
           stats: [
-            { label: 'Active Interns', value: user?._count?.mentoredInternships || '4', icon: <Users className="w-5 h-5 text-emerald-400" /> },
-            { label: 'Allocated Tasks', value: user?._count?.createdTasks || '18', icon: <Clock className="w-5 h-5 text-cyan-400" /> },
-            { label: 'Evaluations Given', value: user?._count?.evaluationsGiven || '6', icon: <Award className="w-5 h-5 text-amber-400" /> },
-            { label: 'Milestone Progress', value: '84%', icon: <TrendingUp className="w-5 h-5 text-teal-400" /> },
+            { label: 'Active Cohorts', value: cohorts.length, icon: <Users className="w-5 h-5 text-emerald-400" /> },
+            { label: 'Total Deliverables', value: totalTasks, icon: <Clock className="w-5 h-5 text-cyan-400" /> },
+            { label: 'Under Review', value: underReviewTasks, icon: <Award className="w-5 h-5 text-amber-400" /> },
+            { label: 'Milestone Progress', value: `${progressPercentage}%`, icon: <TrendingUp className="w-5 h-5 text-teal-400" /> },
           ],
           actions: [
             { title: 'Allocate Task with Deadline', desc: 'Create tasks with description, priority, and due dates' },
-            { title: 'Review Progress Submissions', desc: 'Approve intern daily notes, work URLs, and hours logged' },
+            { title: 'Review Progress & Proof Files', desc: 'Verify intern uploaded documents, work URLs, and hours logged' },
             { title: 'Submit Intern Evaluation', desc: 'Rate technical, communication, and punctuality scores' },
           ],
         };
@@ -84,13 +101,13 @@ export default function DashboardHub() {
           badgeText: 'INTERN STUDENT',
           badgeClass: 'bg-amber-500/20 text-amber-300 border-amber-500/30',
           stats: [
-            { label: 'Active Tasks', value: user?._count?.assignedTasks || '3', icon: <Clock className="w-5 h-5 text-amber-400" /> },
-            { label: 'Progress Updates', value: user?._count?.progressUpdates || '7', icon: <TrendingUp className="w-5 h-5 text-orange-400" /> },
-            { label: 'Evaluations Received', value: user?._count?.evaluationsReceived || '2', icon: <Award className="w-5 h-5 text-yellow-400" /> },
-            { label: 'Average Score', value: '9.2 / 10', icon: <CheckCircle className="w-5 h-5 text-emerald-400" /> },
+            { label: 'Allocated Tasks', value: totalTasks, icon: <Clock className="w-5 h-5 text-amber-400" /> },
+            { label: 'Tasks Completed', value: completedTasks, icon: <CheckCircle className="w-5 h-5 text-emerald-400" /> },
+            { label: 'Pending Review', value: underReviewTasks, icon: <TrendingUp className="w-5 h-5 text-orange-400" /> },
+            { label: 'Milestone Progress', value: `${progressPercentage}%`, icon: <Award className="w-5 h-5 text-yellow-400" /> },
           ],
           actions: [
-            { title: 'Submit Daily Progress Update', desc: 'Log work hours, notes, and deliverable repository links' },
+            { title: 'Submit Work & Proof of Completion', desc: 'Upload deliverable documents, screenshots, and repository links' },
             { title: 'View Assigned Task Deadlines', desc: 'Keep track of TODO, In Progress, and Under Review items' },
             { title: 'Download Performance Certificate PDF', desc: 'Generate verified PDF completion report' },
           ],
@@ -156,6 +173,48 @@ export default function DashboardHub() {
             <p className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">{stat.value}</p>
           </div>
         ))}
+      </div>
+
+      {/* Live Milestone Completion Progress Bar Card */}
+      <div className="glass-card p-6 rounded-2xl border border-slate-700/80 bg-slate-900/80 shadow-xl space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="space-y-1">
+            <h3 className="text-sm font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-2">
+              <TrendingUp className="w-4 h-4" />
+              <span>{user?.role === 'MENTOR' ? 'Overall Intern Deliverables Progress' : 'My Internship Completion Progress'}</span>
+            </h3>
+            <p className="text-xs text-slate-400">
+              {user?.role === 'MENTOR'
+                ? "Tracks approved deliverables across your supervised cohorts. Verifying proofs increases this completion rate."
+                : "Dynamic milestone tracker based on completed and mentor-approved sprint deliverables."}
+            </p>
+          </div>
+          <div className="flex items-baseline gap-2">
+            <span className="text-3xl font-extrabold text-white tracking-tight">{progressPercentage}%</span>
+            <span className="text-xs text-slate-400 font-semibold">Approved</span>
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <div className="w-full h-3 rounded-full bg-slate-800 overflow-hidden p-0.5 border border-slate-700/60">
+            <div
+              className="h-full bg-gradient-to-r from-emerald-500 via-teal-400 to-cyan-400 rounded-full transition-all duration-500 shadow-glow-emerald"
+              style={{ width: `${progressPercentage}%` }}
+            ></div>
+          </div>
+          <div className="flex items-center justify-between text-xs text-slate-400 pt-1">
+            <span className="flex items-center gap-1.5">
+              <CheckCircle className="w-3.5 h-3.5 text-emerald-400" />
+              <strong className="text-slate-200">{completedTasks}</strong> of {totalTasks} deliverables approved
+            </span>
+            {underReviewTasks > 0 && (
+              <span className="text-cyan-300 font-semibold flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping"></span>
+                {underReviewTasks} awaiting review
+              </span>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Core Platform Modules & Next Phases */}
