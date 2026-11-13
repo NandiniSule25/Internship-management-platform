@@ -27,5 +27,8 @@
     "jsonwebtoken": "^9.0.2",
     "pdfkit": "^0.15.1",
     "prisma": "^5.22.0"
+  },
+  "optionalDependencies": {
+    "@rollup/rollup-linux-x64-gnu": "4.65.1"
   }
 }
