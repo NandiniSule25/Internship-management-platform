@@ -7,7 +7,18 @@
 [![Node.js](https://img.shields.io/badge/Backend-Node.js_&_Express-339933?style=for-the-badge&logo=node.js&logoColor=white)](https://nodejs.org/)
 [![React](https://img.shields.io/badge/Frontend-React_18_&_Vite-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
 [![TailwindCSS](https://img.shields.io/badge/Styling-Tailwind_CSS_v4-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
-[![Vercel](https://img.shields.io/badge/Deploy-Vercel-000000?style=for-the-badge&logo=vercel&logoColor=white)](https://vercel.com/)
+[![Vercel](https://img.shields.io/badge/Deploy-Live_on_Vercel-success?style=for-the-badge&logo=vercel&logoColor=white)](https://internship-management-platform-nh5rur1wg.vercel.app)
+
+---
+
+## 🚀 Live Demo & Deployment
+
+* 🌐 **Live Application URL:** **[https://internship-management-platform-nh5rur1wg.vercel.app](https://internship-management-platform-nh5rur1wg.vercel.app)**
+* ⚡ **Production Alias:** **[https://internship-management-platform-nandinisule25s-projects.vercel.app](https://internship-management-platform-nandinisule25s-projects.vercel.app)**
+* 🩺 **Backend API Health Check:** [https://internship-management-platform-nh5rur1wg.vercel.app/api/health](https://internship-management-platform-nh5rur1wg.vercel.app/api/health)
+* 🗄️ **Database Connectivity (PostgreSQL):** [https://internship-management-platform-nh5rur1wg.vercel.app/api/health/db](https://internship-management-platform-nh5rur1wg.vercel.app/api/health/db)
+
+> **Quick Evaluation:** You can log in instantly with the 1-click **Quick Fill** buttons on the login page or using the test credentials listed in the [Demo Credentials](#-pre-seeded-demo-credentials) section below.
 
 ---
 
@@ -22,12 +33,14 @@
 ### 🎓 2. Mentor Command Center
 - **Task Allocation:** Create sprint deliverables with acceptance criteria, priority levels (`LOW`, `MEDIUM`, `HIGH`, `URGENT`), and deadlines.
 - **Interactive Kanban Board:** 4 color-coded lanes (`TODO`, `IN_PROGRESS`, `UNDER_REVIEW`, `COMPLETED`) with real-time lane transitions.
-- **Review Pipeline:** Review daily work logs, hours spent, and deliverable links (GitHub PRs, Figma, docs).
+- **Proof-of-Work Verification:** Inspect submitted work proofs including uploaded documents/screenshots (PDFs, images, archives) and external repository/PR links.
+- **Dynamic Progress Bar Control:** Approving deliverables advances tasks to `COMPLETED` and increases the intern's milestone progress bar; requesting revisions decreases it.
 - **Milestone Evaluations:** Grade interns across Technical Competency, Communication & Teamwork, and Punctuality (1–10 scale) with placement recommendations.
 
 ### 🚀 3. Intern Workspace & Certifications
 - **Task Tracking:** View allocated sprint tasks, due dates, and real-time urgency indicators.
-- **Daily Work Logs:** Submit work progress updates, hours logged, and direct URLs to deliverables.
+- **Work & Proof Submission:** Upload proof files (PDF, PNG, JPG, ZIP up to 8MB), provide deliverable URLs, and log work hours.
+- **Dynamic Milestone Progress:** Real-time visual progress bar tracking approved deliverables towards completion.
 - **Timeline History:** Full interactive timeline of previous submissions and mentor feedback.
 - **Downloadable PDF Certificates:** Download verified, cryptographically audited Performance Reports complete with grading scorecards and faculty signature blocks.
 
@@ -155,6 +168,9 @@ Use the **Instant One-Click Login** buttons on the login screen or enter the fol
 ---
 
 ## ☁️ Deployment on Vercel
+
+* 🌐 **Live URL:** **[https://internship-management-platform-nh5rur1wg.vercel.app](https://internship-management-platform-nh5rur1wg.vercel.app)**
+* ⚡ **Production Domain:** **[https://internship-management-platform-nandinisule25s-projects.vercel.app](https://internship-management-platform-nandinisule25s-projects.vercel.app)**
 
 This repository includes a pre-configured `vercel.json` and `api/index.js` serverless function handler:
 
