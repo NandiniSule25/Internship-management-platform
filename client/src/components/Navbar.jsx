@@ -58,8 +58,18 @@ export default function Navbar({ activeTab, onSelectTab }) {
     },
     {
       id: 'internships',
-      label: 'Cohorts',
-      icon: <Briefcase className="w-3.5 h-3.5" />,
+      label:
+        user?.role === 'MENTOR'
+          ? 'My Interns'
+          : user?.role === 'INSTITUTION_ADMIN'
+          ? 'Interns & Cohorts'
+          : 'My Cohort',
+      icon:
+        user?.role === 'MENTOR' ? (
+          <Users className="w-3.5 h-3.5" />
+        ) : (
+          <Briefcase className="w-3.5 h-3.5" />
+        ),
     },
     {
       id: 'tasks',
