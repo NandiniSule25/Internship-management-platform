@@ -34,6 +34,7 @@ export default function TaskBoard({ initialCohortId = 'ALL' }) {
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [cohortFilter, setCohortFilter] = useState(initialCohortId || 'ALL');
+  const [studentFilter, setStudentFilter] = useState('ALL');
   const [cohorts, setCohorts] = useState([]);
 
   useEffect(() => {
@@ -79,9 +80,19 @@ export default function TaskBoard({ initialCohortId = 'ALL' }) {
     }
   };
 
+  const uniqueStudents = Array.from(
+    new Map(
+      [
+        ...cohorts.map((c) => c.intern).filter(Boolean),
+        ...tasks.map((t) => t.assignee).filter(Boolean),
+      ].map((u) => [u.id, u])
+    ).values()
+  );
+
   const filteredTasks = tasks.filter((t) => {
-    if (cohortFilter === 'ALL') return true;
-    return t.internshipId === cohortFilter;
+    if (cohortFilter !== 'ALL' && t.internshipId !== cohortFilter) return false;
+    if (studentFilter !== 'ALL' && t.assigneeId !== studentFilter) return false;
+    return true;
   });
 
   // Calculate dynamic progress bar stats
@@ -173,6 +184,25 @@ export default function TaskBoard({ initialCohortId = 'ALL' }) {
               ))}
             </select>
           </div>
+
+          {/* Student filter for Mentors and Admins */}
+          {(user.role === 'MENTOR' || user.role === 'INSTITUTION_ADMIN') && uniqueStudents.length > 0 && (
+            <div className="flex items-center gap-2">
+              <User className="w-3.5 h-3.5 text-indigo-400" />
+              <select
+                value={studentFilter}
+                onChange={(e) => setStudentFilter(e.target.value)}
+                className="glass-input text-xs px-3 py-1.5 rounded-xl bg-slate-900 cursor-pointer"
+              >
+                <option value="ALL">All Students ({uniqueStudents.length})</option>
+                {uniqueStudents.map((st) => (
+                  <option key={st.id} value={st.id}>
+                    👤 {st.firstName} {st.lastName}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {/* Allocate Task button for Mentors / Admins */}
           {(user.role === 'MENTOR' || user.role === 'INSTITUTION_ADMIN') && (

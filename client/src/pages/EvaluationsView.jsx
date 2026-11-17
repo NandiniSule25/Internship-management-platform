@@ -21,6 +21,7 @@ export default function EvaluationsView() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [downloadingId, setDownloadingId] = useState(null);
+  const [studentFilter, setStudentFilter] = useState('ALL');
 
   const fetchEvaluations = async () => {
     try {
@@ -62,6 +63,15 @@ export default function EvaluationsView() {
     }
   };
 
+  const uniqueStudents = Array.from(
+    new Map(evaluations.map((e) => e.intern).filter(Boolean).map((u) => [u.id, u])).values()
+  );
+
+  const filteredEvaluations = evaluations.filter((e) => {
+    if (studentFilter !== 'ALL' && e.internId !== studentFilter) return false;
+    return true;
+  });
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
       {/* Header */}
@@ -72,7 +82,7 @@ export default function EvaluationsView() {
               Performance & Certification Center
             </span>
             <span className="text-xs px-2 py-0.5 rounded-full bg-pink-500/10 text-pink-300 font-mono">
-              {evaluations.length} Milestone Scorecards
+              {filteredEvaluations.length} Milestone Scorecards
             </span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight flex items-center gap-3">
@@ -84,16 +94,34 @@ export default function EvaluationsView() {
           </p>
         </div>
 
-        {/* Action button for Mentors / Admins */}
-        {(user.role === 'MENTOR' || user.role === 'INSTITUTION_ADMIN') && (
-          <button
-            onClick={() => setShowModal(true)}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs sm:text-sm text-white bg-gradient-to-r from-pink-600 via-purple-600 to-indigo-600 hover:from-pink-500 hover:to-indigo-500 shadow-glow cursor-pointer transition-all"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Submit New Evaluation</span>
-          </button>
-        )}
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Student Filter */}
+          {uniqueStudents.length > 1 && (
+            <select
+              value={studentFilter}
+              onChange={(e) => setStudentFilter(e.target.value)}
+              className="glass-input text-xs px-3 py-2 rounded-xl bg-slate-900 cursor-pointer"
+            >
+              <option value="ALL">All Students ({uniqueStudents.length})</option>
+              {uniqueStudents.map((st) => (
+                <option key={st.id} value={st.id}>
+                  👤 {st.firstName} {st.lastName}
+                </option>
+              ))}
+            </select>
+          )}
+
+          {/* Action button for Mentors / Admins */}
+          {(user.role === 'MENTOR' || user.role === 'INSTITUTION_ADMIN') && (
+            <button
+              onClick={() => setShowModal(true)}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-xs sm:text-sm text-white bg-gradient-to-r from-pink-600 via-purple-600 to-indigo-600 hover:from-pink-500 hover:to-indigo-500 shadow-glow cursor-pointer transition-all"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Submit New Evaluation</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {loading ? (
@@ -103,7 +131,7 @@ export default function EvaluationsView() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {evaluations.map((ev) => (
+          {filteredEvaluations.map((ev) => (
             <div
               key={ev.id}
               className="glass-card p-6 rounded-2xl border-slate-800 bg-slate-900/60 glass-card-hover flex flex-col justify-between space-y-5"

@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import CreateCohortModal from '../components/CreateCohortModal';
+import StudentListView from '../components/StudentListView';
+import StudentWorkspace from '../components/StudentWorkspace';
 import {
   Briefcase,
   Users,
@@ -23,11 +25,15 @@ export default function InstitutionDashboard() {
   const { user } = useAuth();
   const [metrics, setMetrics] = useState(null);
   const [cohorts, setCohorts] = useState([]);
+  const [tasks, setTasks] = useState([]);
+  const [evaluations, setEvaluations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [updatingId, setUpdatingId] = useState(null);
   const [downloadingSummary, setDownloadingSummary] = useState(false);
+  const [adminViewMode, setAdminViewMode] = useState('STUDENTS'); // 'STUDENTS' | 'COHORTS'
+  const [selectedStudentId, setSelectedStudentId] = useState(null);
 
   const handleDownloadSummaryPdf = async () => {
     try {
@@ -54,9 +60,11 @@ export default function InstitutionDashboard() {
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
-      const [metricsRes, cohortsRes] = await Promise.all([
+      const [metricsRes, cohortsRes, tasksRes, evalsRes] = await Promise.all([
         axios.get(`/api/institutions/${user.institutionId}/metrics`),
         axios.get('/api/internships'),
+        axios.get('/api/tasks').catch(() => ({ data: { tasks: [] } })),
+        axios.get('/api/evaluations').catch(() => ({ data: { evaluations: [] } })),
       ]);
 
       if (metricsRes.data?.data) {
@@ -64,6 +72,12 @@ export default function InstitutionDashboard() {
       }
       if (cohortsRes.data?.internships) {
         setCohorts(cohortsRes.data.internships);
+      }
+      if (tasksRes.data?.tasks) {
+        setTasks(tasksRes.data.tasks);
+      }
+      if (evalsRes.data?.evaluations) {
+        setEvaluations(evalsRes.data.evaluations);
       }
     } catch (err) {
       console.error('Failed to load institution dashboard data:', err);
@@ -90,6 +104,59 @@ export default function InstitutionDashboard() {
     }
   };
 
+  // Build the list of students across the institution
+  const studentMap = {};
+  cohorts.forEach((cohort) => {
+    if (!cohort.intern) return;
+    const internId = cohort.intern.id;
+    if (!studentMap[internId]) {
+      studentMap[internId] = {
+        id: internId,
+        firstName: cohort.intern.firstName,
+        lastName: cohort.intern.lastName,
+        email: cohort.intern.email,
+        phone: cohort.intern.phone || '',
+        cohorts: [],
+        mentor: cohort.mentor,
+      };
+    }
+    studentMap[internId].cohorts.push(cohort);
+  });
+
+  const studentsList = Object.values(studentMap).map((st) => {
+    const studentTasks = tasks.filter(
+      (t) => t.assigneeId === st.id || t.internship?.internId === st.id
+    );
+    const studentEvaluations = evaluations.filter((e) => e.internId === st.id);
+    const totalTasks = studentTasks.length;
+    const completedTasks = studentTasks.filter((t) => t.status === 'COMPLETED').length;
+    const underReviewTasks = studentTasks.filter((t) => t.status === 'UNDER_REVIEW').length;
+    const inProgressTasks = studentTasks.filter((t) => t.status === 'IN_PROGRESS').length;
+    const todoTasks = studentTasks.filter((t) => t.status === 'TODO').length;
+    const progressPercentage =
+      totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+    const primaryCohort = st.cohorts.find((c) => c.status === 'ACTIVE') || st.cohorts[0];
+
+    return {
+      ...st,
+      primaryCohort,
+      tasks: studentTasks,
+      evaluations: studentEvaluations,
+      stats: {
+        totalTasks,
+        completedTasks,
+        underReviewTasks,
+        inProgressTasks,
+        todoTasks,
+        progressPercentage,
+      },
+    };
+  });
+
+  const selectedStudent = selectedStudentId
+    ? studentsList.find((s) => s.id === selectedStudentId)
+    : null;
+
   const filteredCohorts = cohorts.filter((c) => {
     if (statusFilter === 'ALL') return true;
     return c.status === statusFilter;
@@ -112,7 +179,7 @@ export default function InstitutionDashboard() {
     return (
       <div className="p-12 text-center text-slate-400">
         <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
-        <p className="text-xs">Loading institution metrics & cohorts...</p>
+        <p className="text-xs">Loading institution governance metrics & students...</p>
       </div>
     );
   }
@@ -197,12 +264,12 @@ export default function InstitutionDashboard() {
         {/* Enrolled Interns */}
         <div className="glass-card p-5 rounded-2xl border-slate-800 bg-slate-900/60 glass-card-hover">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-semibold text-slate-400">Enrolled Interns</span>
+            <span className="text-xs font-semibold text-slate-400">Enrolled Students</span>
             <div className="w-8 h-8 rounded-xl bg-amber-600/20 text-amber-400 flex items-center justify-center">
               <Users className="w-4 h-4" />
             </div>
           </div>
-          <p className="text-3xl font-black text-white">{metrics?.users?.INTERN || 0}</p>
+          <p className="text-3xl font-black text-white">{studentsList.length || metrics?.users?.INTERN || 0}</p>
           <p className="mt-3 text-[11px] text-slate-400 flex items-center gap-1">
             <TrendingUp className="w-3.5 h-3.5 text-amber-400" />
             <span>Active learning cohort members</span>
@@ -226,131 +293,193 @@ export default function InstitutionDashboard() {
         </div>
       </div>
 
-      {/* Cohorts Management Section */}
-      <div className="glass-card rounded-2xl p-6 border-slate-800 bg-slate-900/60 space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <h2 className="text-lg font-bold text-white flex items-center gap-2">
-              <Briefcase className="w-5 h-5 text-indigo-400" />
-              <span>Internship Cohorts Directory</span>
-            </h2>
-            <p className="text-xs text-slate-400">
-              Showing {filteredCohorts.length} of {cohorts.length} cohorts in {metrics?.institution?.name}
-            </p>
-          </div>
+      {/* Admin Mode Switcher: Enrolled Students View (Default) vs Cohorts Directory */}
+      <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => {
+              setAdminViewMode('STUDENTS');
+              setSelectedStudentId(null);
+            }}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-extrabold transition-all cursor-pointer ${
+              adminViewMode === 'STUDENTS'
+                ? 'bg-violet-600 text-white shadow-glow-purple'
+                : 'text-slate-400 hover:text-white bg-slate-900/60'
+            }`}
+          >
+            <Users className="w-4 h-4" />
+            <span>Enrolled Students First ({studentsList.length})</span>
+          </button>
 
-          {/* Filter Pills */}
-          <div className="flex items-center gap-2 p-1 rounded-xl bg-slate-800/80 border border-slate-700 text-xs">
-            {['ALL', 'ACTIVE', 'PENDING', 'COMPLETED'].map((st) => (
-              <button
-                key={st}
-                onClick={() => setStatusFilter(st)}
-                className={`px-3 py-1.5 rounded-lg font-semibold transition-all cursor-pointer ${
-                  statusFilter === st
-                    ? 'bg-indigo-600 text-white shadow-glow'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                {st}
-              </button>
-            ))}
-          </div>
+          <button
+            onClick={() => setAdminViewMode('COHORTS')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-extrabold transition-all cursor-pointer ${
+              adminViewMode === 'COHORTS'
+                ? 'bg-violet-600 text-white shadow-glow-purple'
+                : 'text-slate-400 hover:text-white bg-slate-900/60'
+            }`}
+          >
+            <Briefcase className="w-4 h-4" />
+            <span>Internship Cohorts Directory ({cohorts.length})</span>
+          </button>
         </div>
 
-        {/* Cohorts Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {filteredCohorts.map((cohort) => (
-            <div
-              key={cohort.id}
-              className="p-5 rounded-2xl bg-slate-800/50 hover:bg-slate-800/80 border border-slate-700/60 transition-all flex flex-col justify-between space-y-4 group"
-            >
-              <div className="space-y-3">
-                {/* Department and Status badge */}
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-slate-700/80 text-slate-300">
-                    {cohort.department}
-                  </span>
-                  <span
-                    className={`text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full border ${getStatusBadge(
-                      cohort.status
-                    )}`}
-                  >
-                    {cohort.status}
-                  </span>
-                </div>
-
-                <h3 className="text-base font-bold text-white group-hover:text-indigo-300 transition-colors line-clamp-2">
-                  {cohort.title}
-                </h3>
-
-                <p className="text-xs text-slate-400 line-clamp-2 leading-relaxed">
-                  {cohort.description || 'No detailed description provided.'}
-                </p>
-
-                {/* Timeline */}
-                <div className="flex items-center gap-2 text-xs text-slate-300 pt-1">
-                  <Calendar className="w-3.5 h-3.5 text-indigo-400" />
-                  <span>
-                    {new Date(cohort.startDate).toLocaleDateString()} — {new Date(cohort.endDate).toLocaleDateString()}
-                  </span>
-                </div>
-
-                {/* Assigned Mentor & Intern Cards */}
-                <div className="pt-2 border-t border-slate-700/60 space-y-2">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-slate-400 flex items-center gap-1.5">
-                      <Award className="w-3.5 h-3.5 text-emerald-400" />
-                      <span>Mentor:</span>
-                    </span>
-                    <span className="font-semibold text-slate-200">
-                      {cohort.mentor ? `${cohort.mentor.firstName} ${cohort.mentor.lastName}` : 'Unassigned'}
-                    </span>
-                  </div>
-
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-slate-400 flex items-center gap-1.5">
-                      <Users className="w-3.5 h-3.5 text-amber-400" />
-                      <span>Intern:</span>
-                    </span>
-                    <span className="font-semibold text-slate-200">
-                      {cohort.intern ? `${cohort.intern.firstName} ${cohort.intern.lastName}` : 'Unassigned'}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Status Action Selector */}
-              <div className="pt-3 border-t border-slate-700/60 flex items-center justify-between">
-                <span className="text-[11px] text-slate-400">Change Status:</span>
-                <select
-                  disabled={updatingId === cohort.id}
-                  value={cohort.status}
-                  onChange={(e) => handleStatusChange(cohort.id, e.target.value)}
-                  className="glass-input text-[11px] px-2 py-1 rounded-lg bg-slate-900 cursor-pointer"
-                >
-                  <option value="ACTIVE">ACTIVE</option>
-                  <option value="PENDING">PENDING</option>
-                  <option value="COMPLETED">COMPLETED</option>
-                  <option value="CANCELLED">CANCELLED</option>
-                </select>
-              </div>
-            </div>
-          ))}
-
-          {filteredCohorts.length === 0 && (
-            <div className="col-span-full py-12 text-center text-slate-400 space-y-2">
-              <Briefcase className="w-8 h-8 mx-auto text-slate-600" />
-              <p className="text-sm font-semibold">No internship cohorts found under this filter.</p>
-              <button
-                onClick={() => setShowCreateModal(true)}
-                className="text-xs text-indigo-400 hover:underline cursor-pointer"
-              >
-                Create your first cohort now
-              </button>
-            </div>
-          )}
-        </div>
+        <span className="text-xs text-slate-400 hidden sm:inline">
+          {adminViewMode === 'STUDENTS'
+            ? 'Student-centric governance & deliverable inspection'
+            : 'Cohort timeline & supervisor allocations'}
+        </span>
       </div>
+
+      {/* Dynamic View: Students List / Student Workspace vs Cohorts Directory */}
+      {adminViewMode === 'STUDENTS' ? (
+        selectedStudent ? (
+          /* Student Workspace for Admin */
+          <StudentWorkspace
+            student={selectedStudent}
+            allStudents={studentsList}
+            onSelectStudent={(id) => setSelectedStudentId(id)}
+            onBackToList={() => setSelectedStudentId(null)}
+            onRefresh={fetchDashboardData}
+            userRole="INSTITUTION_ADMIN"
+          />
+        ) : (
+          /* Student List First */
+          <StudentListView
+            students={studentsList}
+            onSelectStudent={(id) => setSelectedStudentId(id)}
+            userRole="INSTITUTION_ADMIN"
+            title="Institutional Student-Centric Tracker"
+            subtitle="Directory of all enrolled students. Select any student to view their allocated sprint tasks, proof of work, milestone progress, and supervisor evaluations."
+          />
+        )
+      ) : (
+        /* Cohorts Management Section */
+        <div className="glass-card rounded-2xl p-6 border-slate-800 bg-slate-900/60 space-y-6 animate-in fade-in">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                <Briefcase className="w-5 h-5 text-indigo-400" />
+                <span>Internship Cohorts Directory</span>
+              </h2>
+              <p className="text-xs text-slate-400">
+                Showing {filteredCohorts.length} of {cohorts.length} cohorts in {metrics?.institution?.name}
+              </p>
+            </div>
+
+            {/* Filter Pills */}
+            <div className="flex items-center gap-2 p-1 rounded-xl bg-slate-800/80 border border-slate-700 text-xs">
+              {['ALL', 'ACTIVE', 'PENDING', 'COMPLETED'].map((st) => (
+                <button
+                  key={st}
+                  onClick={() => setStatusFilter(st)}
+                  className={`px-3 py-1.5 rounded-lg font-semibold transition-all cursor-pointer ${
+                    statusFilter === st
+                      ? 'bg-indigo-600 text-white shadow-glow'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  {st}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Cohorts Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            {filteredCohorts.map((cohort) => (
+              <div
+                key={cohort.id}
+                className="p-5 rounded-2xl bg-slate-800/50 hover:bg-slate-800/80 border border-slate-700/60 transition-all flex flex-col justify-between space-y-4 group"
+              >
+                <div className="space-y-3">
+                  {/* Department and Status badge */}
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-slate-700/80 text-slate-300">
+                      {cohort.department}
+                    </span>
+                    <span
+                      className={`text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full border ${getStatusBadge(
+                        cohort.status
+                      )}`}
+                    >
+                      {cohort.status}
+                    </span>
+                  </div>
+
+                  <h3 className="text-base font-bold text-white group-hover:text-indigo-300 transition-colors line-clamp-2">
+                    {cohort.title}
+                  </h3>
+
+                  <p className="text-xs text-slate-400 line-clamp-2 leading-relaxed">
+                    {cohort.description || 'No detailed description provided.'}
+                  </p>
+
+                  {/* Timeline */}
+                  <div className="flex items-center gap-2 text-xs text-slate-300 pt-1">
+                    <Calendar className="w-3.5 h-3.5 text-indigo-400" />
+                    <span>
+                      {new Date(cohort.startDate).toLocaleDateString()} — {new Date(cohort.endDate).toLocaleDateString()}
+                    </span>
+                  </div>
+
+                  {/* Assigned Mentor & Intern Cards */}
+                  <div className="pt-2 border-t border-slate-700/60 space-y-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-slate-400 flex items-center gap-1.5">
+                        <Award className="w-3.5 h-3.5 text-emerald-400" />
+                        <span>Mentor:</span>
+                      </span>
+                      <span className="font-semibold text-slate-200">
+                        {cohort.mentor ? `${cohort.mentor.firstName} ${cohort.mentor.lastName}` : 'Unassigned'}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-slate-400 flex items-center gap-1.5">
+                        <Users className="w-3.5 h-3.5 text-amber-400" />
+                        <span>Intern:</span>
+                      </span>
+                      <span className="font-semibold text-slate-200">
+                        {cohort.intern ? `${cohort.intern.firstName} ${cohort.intern.lastName}` : 'Unassigned'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Status Action Selector */}
+                <div className="pt-3 border-t border-slate-700/60 flex items-center justify-between">
+                  <span className="text-[11px] text-slate-400">Change Status:</span>
+                  <select
+                    disabled={updatingId === cohort.id}
+                    value={cohort.status}
+                    onChange={(e) => handleStatusChange(cohort.id, e.target.value)}
+                    className="glass-input text-[11px] px-2 py-1 rounded-lg bg-slate-900 cursor-pointer"
+                  >
+                    <option value="ACTIVE">ACTIVE</option>
+                    <option value="PENDING">PENDING</option>
+                    <option value="COMPLETED">COMPLETED</option>
+                    <option value="CANCELLED">CANCELLED</option>
+                  </select>
+                </div>
+              </div>
+            ))}
+
+            {filteredCohorts.length === 0 && (
+              <div className="col-span-full py-12 text-center text-slate-400 space-y-2">
+                <Briefcase className="w-8 h-8 mx-auto text-slate-600" />
+                <p className="text-sm font-semibold">No internship cohorts found under this filter.</p>
+                <button
+                  onClick={() => setShowCreateModal(true)}
+                  className="text-xs text-indigo-400 hover:underline cursor-pointer"
+                >
+                  Create your first cohort now
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Cohort Creation Modal */}
       <CreateCohortModal
